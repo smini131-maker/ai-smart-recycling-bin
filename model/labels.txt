@@ -1,0 +1,6 @@
+background
+can
+clear_pet
+plastic
+paper
+other
