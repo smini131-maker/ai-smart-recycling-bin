@@ -1,0 +1,25 @@
+name: Validate repository
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  source-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile published Python files
+        run: |
+          python -m py_compile \
+            smart_bin_final.py \
+            smart_bin_hardware.py \
+            smart_bin_camera_ai.py \
+            smart_bin_camera_ai_specialist.py \
+            pet_plastic_specialist_runtime.py \
+            scripts/preflight.py
+      - name: Validate source and configuration
+        run: python scripts/preflight.py --source-only
