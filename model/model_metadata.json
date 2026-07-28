@@ -1,0 +1,25 @@
+{
+  "model": "MobileNetV2 alpha 0.5",
+  "datasets": [
+    "AI Hub 71385 indoor sorter",
+    "AI Hub 495 PP"
+  ],
+  "input_shape": [1, 224, 224, 3],
+  "input_dtype": "<class 'numpy.float32'>",
+  "output_shape": [1, 6],
+  "output_dtype": "<class 'numpy.float32'>",
+  "class_order": [
+    "background",
+    "can",
+    "clear_pet",
+    "plastic",
+    "paper",
+    "other"
+  ],
+  "preprocessing": "RGB float32 input; MobileNetV2 preprocess_input is included inside the model",
+  "training_policy": "mixed_float16",
+  "export_policy": "float32",
+  "quantization": "dynamic range",
+  "test_accuracy": 0.8618391752243042,
+  "keras_tflite_max_abs_difference": 1.548465800027543e-10
+}
