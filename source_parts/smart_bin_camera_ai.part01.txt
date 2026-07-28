@@ -1,0 +1,482 @@
+def extract_luma_from_yuv420(
+    yuv_array: np.ndarray,
+    width: int,
+    height: int,
+) -> np.ndarray:
+    """YUV420 배열에서 밝기 정보인 Y 평면만 꺼낸다."""
+    if not isinstance(yuv_array, np.ndarray):
+        raise TypeError(
+            "저해상도 카메라 결과가 NumPy 배열이 아닙니다."
+        )
+
+    if yuv_array.ndim != 2:
+        raise ValueError(
+            "YUV420 배열이 2차원이 아닙니다. "
+            f"현재 shape: {yuv_array.shape}"
+        )
+
+    if yuv_array.shape[0] < height:
+        raise ValueError(
+            "YUV420 배열 높이가 예상보다 작습니다. "
+            f"현재: {yuv_array.shape}, 예상 높이: {height}"
+        )
+
+    if yuv_array.shape[1] < width:
+        raise ValueError(
+            "YUV420 배열 너비가 예상보다 작습니다. "
+            f"현재: {yuv_array.shape}, 예상 너비: {width}"
+        )
+
+    luma = yuv_array[:height, :width]
+
+    if luma.dtype != np.uint8:
+        luma = luma.astype(
+            np.uint8,
+            copy=False,
+        )
+
+    return np.ascontiguousarray(luma)
+
+
+def preprocess_detection_frame(
+    yuv_array: np.ndarray,
+    width: int,
+    height: int,
+) -> np.ndarray:
+    """저해상도 영상에서 ROI를 잘라 감지용 영상으로 만든다."""
+    luma = extract_luma_from_yuv420(
+        yuv_array,
+        width,
+        height,
+    )
+
+    x1, y1, x2, y2 = calculate_roi_coordinates(
+        width,
+        height,
+    )
+
+    roi_luma = luma[y1:y2, x1:x2]
+
+    if roi_luma.size == 0:
+        raise ValueError(
+            "물체 감지 ROI가 비어 있습니다."
+        )
+
+    pil_image = Image.fromarray(
+        roi_luma
+    )
+
+    resized = pil_image.resize(
+        DETECTION_IMAGE_SIZE,
+        resample=Image.Resampling.BILINEAR,
+    )
+
+    blurred = resized.filter(
+        ImageFilter.GaussianBlur(
+            radius=GAUSSIAN_BLUR_RADIUS
+        )
+    )
+
+    processed = np.asarray(
+        blurred,
+        dtype=np.float32,
+    )
+
+    expected_shape = (
+        DETECTION_IMAGE_SIZE[1],
+        DETECTION_IMAGE_SIZE[0],
+    )
+
+    if processed.shape != expected_shape:
+        raise ValueError(
+            "감지 영상 shape가 예상과 다릅니다. "
+            f"현재: {processed.shape}, 예상: {expected_shape}"
+        )
+
+    if not np.all(np.isfinite(processed)):
+        raise ValueError(
+            "감지 영상에 NaN 또는 Inf가 있습니다."
+        )
+
+    return processed
+
+
+def build_background(
+    picam2: Picamera2,
+    detection_width: int,
+    detection_height: int,
+) -> np.ndarray:
+    """여러 빈 프레임의 중앙값으로 기준 배경을 생성한다."""
+    print("[초기화] 기준 배경 생성 중")
+    print("[주의] 인식 구역을 비운 상태로 유지하세요.")
+
+    frames: list[np.ndarray] = []
+
+    for index in range(BACKGROUND_FRAME_COUNT):
+        yuv_array = picam2.capture_array(
+            "lores"
+        )
+
+        processed = preprocess_detection_frame(
+            yuv_array,
+            detection_width,
+            detection_height,
+        )
+
+        frames.append(processed)
+
+        current_count = index + 1
+
+        if (
+            current_count == 1
+            or current_count % 5 == 0
+            or current_count == BACKGROUND_FRAME_COUNT
+        ):
+            print(
+                f"  기준 배경 수집: "
+                f"{current_count}/{BACKGROUND_FRAME_COUNT}"
+            )
+
+        time.sleep(
+            BACKGROUND_FRAME_INTERVAL_SEC
+        )
+
+    stacked = np.stack(
+        frames,
+        axis=0,
+    )
+
+    background = np.median(
+        stacked,
+        axis=0,
+    ).astype(np.float32)
+
+    variation = float(
+        np.mean(
+            np.std(stacked, axis=0)
+        )
+    )
+
+    print("[초기화] 기준 배경 생성 완료")
+    print(
+        f"  평균 밝기: "
+        f"{float(np.mean(background)):.2f}"
+    )
+    print(
+        f"  수집 중 평균 표준편차: "
+        f"{variation:.2f}"
+    )
+
+    return background
+
+
+def calculate_change(
+    background: np.ndarray,
+    current: np.ndarray,
+) -> tuple[float, float, float]:
+    """기준 배경과 현재 ROI의 변화량을 계산한다."""
+    if background.shape != current.shape:
+        raise ValueError(
+            "기준 배경과 현재 영상의 shape가 다릅니다."
+        )
+
+    brightness_shift = float(
+        np.median(current - background)
+    )
+
+    brightness_corrected = (
+        current - brightness_shift
+    )
+
+    difference = np.abs(
+        brightness_corrected - background
+    )
+
+    changed_ratio = float(
+        np.mean(
+            difference >= PIXEL_DIFF_THRESHOLD
+        )
+    )
+
+    mean_difference = float(
+        np.mean(difference)
+    )
+
+    return (
+        changed_ratio,
+        mean_difference,
+        brightness_shift,
+    )
+
+
+def update_background(
+    background: np.ndarray,
+    current: np.ndarray,
+    alpha: float = BACKGROUND_UPDATE_ALPHA,
+) -> np.ndarray:
+    """빈 상태에서 기준 배경을 천천히 갱신한다."""
+    updated = (
+        (1.0 - alpha) * background
+        + alpha * current
+    )
+
+    return updated.astype(
+        np.float32,
+        copy=False,
+    )
+
+
+def prepare_model_input(
+    frame_rgb: np.ndarray,
+) -> np.ndarray:
+    """
+    전체 RGB 프레임에서 ROI를 자른 뒤 중앙 정사각형 크롭하고
+    224×224 float32 0~255 입력을 만든다.
+    """
+    if not isinstance(frame_rgb, np.ndarray):
+        raise TypeError(
+            "분류용 카메라 프레임이 NumPy 배열이 아닙니다."
+        )
+
+    if frame_rgb.ndim != 3:
+        raise ValueError(
+            "분류용 카메라 프레임이 3차원이 아닙니다. "
+            f"현재: {frame_rgb.shape}"
+        )
+
+    if frame_rgb.shape[2] != 3:
+        raise ValueError(
+            "분류용 카메라 프레임의 채널 수가 3개가 아닙니다."
+        )
+
+    if frame_rgb.dtype != np.uint8:
+        raise TypeError(
+            "분류용 카메라 프레임 dtype이 uint8이 아닙니다. "
+            f"현재: {frame_rgb.dtype}"
+        )
+
+    height, width, _ = frame_rgb.shape
+
+    x1, y1, x2, y2 = calculate_roi_coordinates(
+        width,
+        height,
+    )
+
+    roi_rgb = frame_rgb[y1:y2, x1:x2]
+
+    if roi_rgb.size == 0:
+        raise ValueError(
+            "분류용 ROI가 비어 있습니다."
+        )
+
+    roi_height, roi_width, _ = roi_rgb.shape
+    square_size = min(
+        roi_width,
+        roi_height,
+    )
+
+    square_x1 = (
+        roi_width - square_size
+    ) // 2
+
+    square_y1 = (
+        roi_height - square_size
+    ) // 2
+
+    square_x2 = square_x1 + square_size
+    square_y2 = square_y1 + square_size
+
+    cropped_rgb = roi_rgb[
+        square_y1:square_y2,
+        square_x1:square_x2,
+    ]
+
+    if cropped_rgb.size == 0:
+        raise ValueError(
+            "분류용 중앙 크롭 결과가 비어 있습니다."
+        )
+
+    pil_image = Image.fromarray(
+        cropped_rgb
+    )
+
+    resized = pil_image.resize(
+        (224, 224),
+        resample=Image.Resampling.BILINEAR,
+    )
+
+    resized_rgb = np.asarray(
+        resized,
+        dtype=np.uint8,
+    )
+
+    if resized_rgb.shape != (224, 224, 3):
+        raise ValueError(
+            "224×224 리사이즈 결과가 올바르지 않습니다. "
+            f"현재: {resized_rgb.shape}"
+        )
+
+    model_input = resized_rgb.astype(
+        np.float32,
+        copy=False,
+    )
+
+    model_input = np.expand_dims(
+        model_input,
+        axis=0,
+    )
+
+    if model_input.shape != EXPECTED_INPUT_SHAPE:
+        raise ValueError(
+            "모델 입력 shape가 잘못되었습니다. "
+            f"현재: {model_input.shape}"
+        )
+
+    if model_input.dtype != np.float32:
+        raise TypeError(
+            "모델 입력 dtype이 float32가 아닙니다."
+        )
+
+    if not np.all(np.isfinite(model_input)):
+        raise ValueError(
+            "모델 입력에 NaN 또는 Inf가 있습니다."
+        )
+
+    minimum = float(
+        np.min(model_input)
+    )
+    maximum = float(
+        np.max(model_input)
+    )
+
+    if minimum < 0.0 or maximum > 255.0:
+        raise ValueError(
+            "모델 입력 범위가 0~255를 벗어났습니다. "
+            f"현재: {minimum:.2f}~{maximum:.2f}"
+        )
+
+    return model_input
+
+
+def run_single_inference(
+    interpreter: Any,
+    input_detail: dict[str, Any],
+    output_detail: dict[str, Any],
+    model_input: np.ndarray,
+    labels: list[str],
+) -> tuple[str, float, np.ndarray, float]:
+    """한 프레임의 TFLite 추론을 실행한다."""
+    interpreter.set_tensor(
+        int(input_detail["index"]),
+        model_input,
+    )
+
+    inference_started_at = time.perf_counter()
+
+    interpreter.invoke()
+
+    inference_elapsed_sec = (
+        time.perf_counter()
+        - inference_started_at
+    )
+
+    raw_output = interpreter.get_tensor(
+        int(output_detail["index"])
+    )
+
+    probabilities = np.asarray(
+        raw_output,
+        dtype=np.float32,
+    ).reshape(-1)
+
+    if probabilities.size != len(labels):
+        raise ValueError(
+            "출력 확률 개수와 라벨 수가 다릅니다. "
+            f"출력: {probabilities.size}, 라벨: {len(labels)}"
+        )
+
+    if not np.all(np.isfinite(probabilities)):
+        raise ValueError(
+            "모델 출력에 NaN 또는 Inf가 있습니다."
+        )
+
+    probability_sum = float(
+        np.sum(
+            probabilities,
+            dtype=np.float64,
+        )
+    )
+
+    if (
+        abs(probability_sum - 1.0)
+        > PROBABILITY_SUM_TOLERANCE
+    ):
+        raise ValueError(
+            "모델 출력 확률 합이 1과 크게 다릅니다. "
+            f"현재: {probability_sum:.8f}"
+        )
+
+    best_index = int(
+        np.argmax(probabilities)
+    )
+
+    best_label = labels[best_index]
+    best_confidence = float(
+        probabilities[best_index]
+    )
+
+    return (
+        best_label,
+        best_confidence,
+        probabilities,
+        inference_elapsed_sec,
+    )
+
+
+def format_vote_counts(
+    history: deque[tuple[str, float]],
+) -> str:
+    """현재까지의 클래스별 투표 수를 문자열로 만든다."""
+    counts = Counter(
+        label
+        for label, _ in history
+    )
+
+    parts: list[str] = []
+
+    for label in EXPECTED_LABELS:
+        count = counts.get(label, 0)
+
+        if count > 0:
+            parts.append(
+                f"{label}={count}"
+            )
+
+    return ", ".join(parts)
+
+
+def recognize_object(
+    picam2: Picamera2,
+    interpreter: Any,
+    input_detail: dict[str, Any],
+    output_detail: dict[str, Any],
+    labels: list[str],
+) -> dict[str, Any]:
+    """7개의 추론 결과를 모아 최종 분류를 결정한다."""
+    history: deque[tuple[str, float]] = deque(
+        maxlen=HISTORY_SIZE
+    )
+
+    recognition_started_at = time.monotonic()
+    inference_times: list[float] = []
+
+    frame_number = 0
+
+    print("[인식] AI 분류 중")
+    print(
+        f"[인식] {HISTORY_SIZE}개 프레임을 수집합니다."
+    )
+
+    while (
+        frame_number < MAX_RECOGNITION_FRAMES
+        and len(history) < HISTORY_
