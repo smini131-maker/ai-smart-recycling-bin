@@ -1,0 +1,28 @@
+          print(
+                    "[주의] 카메라 해제 중 오류: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(
+            main()
+        )
+
+    except KeyboardInterrupt:
+        print(
+            "\n[중단] 사용자가 Ctrl+C로 종료했습니다."
+        )
+
+        raise SystemExit(130)
+
+    except Exception as exc:
+        print(
+            f"\n[오류] "
+            f"{type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+
+        raise SystemExit(1)
+
