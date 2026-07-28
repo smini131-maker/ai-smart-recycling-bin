@@ -58,3 +58,5 @@ jobs:
           git add -A
           git commit -m 'feat: publish competition source code and documentation'
           git push
+
+# Triggered after all source bundle parts were uploaded.
