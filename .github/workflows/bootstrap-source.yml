@@ -5,6 +5,8 @@ on:
     paths:
       - '.bootstrap/source.part*'
       - '.github/workflows/bootstrap-source.yml'
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Restore source archive
         shell: bash
@@ -58,5 +62,3 @@ jobs:
           git add -A
           git commit -m 'feat: publish competition source code and documentation'
           git push
-
-# Triggered after all source bundle parts were uploaded.
