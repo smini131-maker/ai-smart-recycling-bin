@@ -2,13 +2,14 @@
 set -euo pipefail
 
 SOURCE_DIR="/home/smini131/smart_bin"
-PUBLISH_DIR="/home/smini131/ai-smart-recycling-bin-publish"
 REPOSITORY="https://github.com/smini131-maker/ai-smart-recycling-bin.git"
+WORK_DIR="$(mktemp -d /home/smini131/ai-smart-bin-publish.XXXXXX)"
 
-restart_service() {
+cleanup() {
+  rm -rf "${WORK_DIR}"
   sudo systemctl start smart-bin.service 2>/dev/null || true
 }
-trap restart_service EXIT
+trap cleanup EXIT
 
 sudo systemctl stop smart-bin.service 2>/dev/null || true
 
@@ -24,9 +25,8 @@ for required in \
   fi
 done
 
-rm -rf "${PUBLISH_DIR}"
-git clone "${REPOSITORY}" "${PUBLISH_DIR}"
-cd "${PUBLISH_DIR}"
+git clone "${REPOSITORY}" "${WORK_DIR}/repo"
+cd "${WORK_DIR}/repo"
 
 mkdir -p model audio
 cp "${SOURCE_DIR}/model/garbage_classifier.tflite" model/
