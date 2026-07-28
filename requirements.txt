@@ -1,0 +1,7 @@
+# Raspberry Pi OS system packages provide picamera2 and libcamera.
+numpy>=1.26,<3
+Pillow>=10,<12
+adafruit-circuitpython-servokit>=1.3,<2
+gpiozero>=2,<3
+lgpio>=0.2.2
+ai-edge-litert>=1.2,<3
