@@ -1,0 +1,67 @@
+{
+  "version": 9,
+  "servo": {
+    "enabled": true,
+    "i2c_address": "0x40",
+    "frequency_hz": 50,
+    "min_pulse_us": 600,
+    "max_pulse_us": 2400,
+    "step_degrees": 1,
+    "step_delay_sec": 0.005,
+    "open_hold_sec": 4.0,
+    "detach_after_close": true,
+    "assume_closed_at_start": true,
+    "channels": {
+      "can": {"channel": 0, "closed_angle": 170.0, "open_angle": 10.0},
+      "clear_pet": {"channel": 4, "closed_angle": 10.0, "open_angle": 170.0},
+      "plastic": {"channel": 11, "closed_angle": 10.0, "open_angle": 170.0},
+      "paper": {"channel": 15, "closed_angle": 10.0, "open_angle": 170.0}
+    },
+    "move_step_delay_sec": 0.005,
+    "servo_step_delay_sec": 0.005
+  },
+  "audio": {
+    "enabled": true,
+    "device": "auto_usb",
+    "player": "aplay",
+    "files": {
+      "ready": "ready.wav",
+      "can": "can.wav",
+      "clear_pet": "clear_pet.wav",
+      "plastic": "plastic.wav",
+      "paper": "paper.wav",
+      "other": "other.wav",
+      "background": "background.wav",
+      "uncertain": "uncertain.wav",
+      "timeout": "timeout.wav",
+      "remove_wait": "remove_wait.wav"
+    }
+  },
+  "behavior": {
+    "play_audio_before_opening": true,
+    "open_only_for_confirmed_recyclables": true,
+    "continue_if_audio_fails": true,
+    "continue_if_servo_fails": false
+  },
+  "pir": {
+    "enabled": true,
+    "gpio_pin": 17,
+    "warmup_sec": 45.0,
+    "cooldown_sec": 20.0,
+    "queue_len": 10,
+    "sample_rate": 20,
+    "threshold": 0.8,
+    "startup_fallback_sec": 75.0,
+    "initial_low_sec": 2.0,
+    "rearm_low_sec": 5.0,
+    "no_result_timeout_sec": 90.0,
+    "greeting_mode": "once_per_program"
+  },
+  "production": {
+    "detection_enter_change_ratio": 0.07,
+    "lock_reminder_sec": 8.0,
+    "announce_only_after_camera_ready": true,
+    "other_audio": "other",
+    "lock_reminder_audio": "remove_wait"
+  }
+}
