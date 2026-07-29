@@ -161,29 +161,17 @@ sudo journalctl -u smart-bin.service -f
 
 자세한 절차는 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)를 확인하십시오.
 
-## 제출 전 점검
-
-소스와 설정만 점검:
-
-```bash
-python scripts/preflight.py --source-only
-```
-
-모델과 WAV까지 모두 포함한 최종 점검:
-
-```bash
-python scripts/preflight.py
-```
-
 ## 대회 제출 링크
 
 - GitHub 소스코드: **https://github.com/smini131-maker/ai-smart-recycling-bin**
 - YouTube 시연 영상: **https://youtu.be/eEvfFPyp1-g**
 
 ## 개발자
-
+- 김서진
+- 길지연
+- 윤아선
+- 이채은
 - 정승민
-- 인공지능공학부
 
 ## 라이선스 및 데이터
 
