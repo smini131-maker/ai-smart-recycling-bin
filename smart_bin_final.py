@@ -17,7 +17,7 @@ import smart_bin_camera_ai_specialist as specialist_app
 from smart_bin_hardware import SmartBinHardware
 
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path("/home/smini131/smart_bin")
 CONFIG_PATH = PROJECT_DIR / "hardware_config.json"
 
 base = specialist_app.base

@@ -4,9 +4,17 @@
     "AI Hub 71385 indoor sorter",
     "AI Hub 495 PP"
   ],
-  "input_shape": [1, 224, 224, 3],
+  "input_shape": [
+    1,
+    224,
+    224,
+    3
+  ],
   "input_dtype": "<class 'numpy.float32'>",
-  "output_shape": [1, 6],
+  "output_shape": [
+    1,
+    6
+  ],
   "output_dtype": "<class 'numpy.float32'>",
   "class_order": [
     "background",

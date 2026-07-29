@@ -12,17 +12,33 @@
     "detach_after_close": true,
     "assume_closed_at_start": true,
     "channels": {
-      "can": {"channel": 0, "closed_angle": 170.0, "open_angle": 10.0},
-      "clear_pet": {"channel": 4, "closed_angle": 10.0, "open_angle": 170.0},
-      "plastic": {"channel": 11, "closed_angle": 10.0, "open_angle": 170.0},
-      "paper": {"channel": 15, "closed_angle": 10.0, "open_angle": 170.0}
+      "can": {
+        "channel": 0,
+        "closed_angle": 170.0,
+        "open_angle": 10.0
+      },
+      "clear_pet": {
+        "channel": 4,
+        "closed_angle": 10.0,
+        "open_angle": 170.0
+      },
+      "plastic": {
+        "channel": 11,
+        "closed_angle": 10.0,
+        "open_angle": 170.0
+      },
+      "paper": {
+        "channel": 15,
+        "closed_angle": 10.0,
+        "open_angle": 170.0
+      }
     },
     "move_step_delay_sec": 0.005,
     "servo_step_delay_sec": 0.005
   },
   "audio": {
     "enabled": true,
-    "device": "auto_usb",
+    "device": "plughw:CARD=Device,DEV=0",
     "player": "aplay",
     "files": {
       "ready": "ready.wav",

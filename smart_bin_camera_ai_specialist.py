@@ -9,7 +9,7 @@ from pet_plastic_specialist_runtime import (
     recognize_pet_or_plastic,
 )
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path("/home/smini131/smart_bin")
 SPECIALIST_MODEL_PATH = (
     PROJECT_DIR
     / "model"

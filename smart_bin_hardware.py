@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path("/home/smini131/smart_bin")
 DEFAULT_CONFIG_PATH = PROJECT_DIR / "hardware_config.json"
 AUDIO_DIR = PROJECT_DIR / "audio"
 
@@ -241,7 +241,7 @@ class ServoController:
         except ImportError as error:
             raise RuntimeError(
                 "adafruit_servokit이 설치되지 않았습니다.\n"
-                "source .venv/bin/activate\n"
+                "source /home/smini131/smart_bin/.venv/bin/activate\n"
                 "python -m pip install "
                 "adafruit-circuitpython-servokit"
             ) from error

@@ -3,29 +3,70 @@
   "model_name": "PET Plastic Specialist",
   "architecture": "MobileNetV2 alpha 0.5",
   "selected_phase": "fine_tune",
-  "class_order": ["clear_pet", "plastic"],
-  "input_shape": [1, 224, 224, 3],
+  "class_order": [
+    "clear_pet",
+    "plastic"
+  ],
+  "input_shape": [
+    1,
+    224,
+    224,
+    3
+  ],
   "input_dtype": "float32",
-  "output_shape": [1, 2],
+  "output_shape": [
+    1,
+    2
+  ],
   "output_dtype": "float32",
   "preprocessing": "RGB float32 0..255. MobileNetV2 preprocess_input is included inside the model.",
   "dataset_counts": {
-    "train": {"clear_pet": 10000, "plastic": 10000},
-    "validation": {"clear_pet": 800, "plastic": 800},
-    "test": {"clear_pet": 225, "plastic": 225}
+    "train": {
+      "clear_pet": 10000,
+      "plastic": 10000
+    },
+    "validation": {
+      "clear_pet": 800,
+      "plastic": 800
+    },
+    "test": {
+      "clear_pet": 225,
+      "plastic": 225
+    }
   },
   "dataset_source_counts": {
     "train": {
-      "clear_pet": {"existing": 3000, "new_aihub": 7000, "local": 0},
-      "plastic": {"existing": 10000, "local": 0}
+      "clear_pet": {
+        "existing": 3000,
+        "new_aihub": 7000,
+        "local": 0
+      },
+      "plastic": {
+        "existing": 10000,
+        "local": 0
+      }
     },
     "validation": {
-      "clear_pet": {"existing": 200, "new_aihub": 600, "local": 0},
-      "plastic": {"existing": 800, "local": 0}
+      "clear_pet": {
+        "existing": 200,
+        "new_aihub": 600,
+        "local": 0
+      },
+      "plastic": {
+        "existing": 800,
+        "local": 0
+      }
     },
     "test": {
-      "clear_pet": {"existing": 225, "new_aihub": 0, "local": 0},
-      "plastic": {"existing": 225, "local": 0}
+      "clear_pet": {
+        "existing": 225,
+        "new_aihub": 0,
+        "local": 0
+      },
+      "plastic": {
+        "existing": 225,
+        "local": 0
+      }
     }
   },
   "keras_test_accuracy": 0.962222,

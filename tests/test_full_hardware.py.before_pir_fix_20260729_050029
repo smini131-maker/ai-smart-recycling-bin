@@ -1,0 +1,322 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import time
+from pathlib import Path
+from typing import Any
+
+os.environ.setdefault("GPIOZERO_PIN_FACTORY", "lgpio")
+
+from adafruit_servokit import ServoKit
+from gpiozero import MotionSensor
+
+PROJECT = Path("/home/smini131/smart_bin")
+CONFIG_PATH = PROJECT / "hardware_config.json"
+AUDIO_DIR = PROJECT / "audio"
+
+LABELS = ("can", "clear_pet", "plastic", "paper")
+LABEL_KO = {
+    "can": "캔",
+    "clear_pet": "투명 페트병",
+    "plastic": "플라스틱",
+    "paper": "종이",
+}
+EXPECTED_CHANNELS = {
+    "can": 0,
+    "clear_pet": 4,
+    "plastic": 11,
+    "paper": 15,
+}
+
+
+def load_config() -> dict[str, Any]:
+    data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    channels = data["servo"]["channels"]
+
+    for label, expected in EXPECTED_CHANNELS.items():
+        actual = int(channels[label]["channel"])
+        if actual != expected:
+            raise RuntimeError(
+                f"{label} 채널이 {actual}입니다. 최종 채널은 {expected}입니다."
+            )
+
+    return data
+
+
+def find_usb_audio() -> str:
+    result = subprocess.run(
+        ["aplay", "-l"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    listing = result.stdout + result.stderr
+    pattern = re.compile(r"card\s+(\d+):.*device\s+(\d+):", re.I)
+
+    for line in listing.splitlines():
+        if "usb" not in line.lower():
+            continue
+        match = pattern.search(line)
+        if match:
+            return f"plughw:{match.group(1)},{match.group(2)}"
+
+    raise RuntimeError("USB 오디오 장치를 찾지 못했습니다. `aplay -l`을 확인하세요.")
+
+
+def play_wav(name: str, device: str, enabled: bool) -> None:
+    if not enabled:
+        print(f"[음성 생략] {name}")
+        return
+
+    path = AUDIO_DIR / f"{name}.wav"
+    if not path.is_file():
+        raise FileNotFoundError(f"음성 파일이 없습니다: {path}")
+
+    print(f"[음성] {path.name}")
+    result = subprocess.run(
+        ["aplay", "-q", "-D", device, str(path)],
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"음성 재생 실패: {name}")
+
+
+class Tester:
+    def __init__(self, config: dict[str, Any], audio_enabled: bool) -> None:
+        self.config = config
+        self.channels = config["servo"]["channels"]
+        servo_cfg = config["servo"]
+
+        address = servo_cfg.get("i2c_address", "0x40")
+        if isinstance(address, str):
+            address = int(address, 0)
+
+        self.kit = ServoKit(
+            channels=16,
+            address=int(address),
+            frequency=int(servo_cfg.get("frequency_hz", 50)),
+        )
+        self.min_pulse = int(servo_cfg.get("min_pulse_us", 600))
+        self.max_pulse = int(servo_cfg.get("max_pulse_us", 2400))
+        self.hold_seconds = float(
+            servo_cfg.get(
+                "open_duration_sec",
+                servo_cfg.get("hold_seconds", 4.0),
+            )
+        )
+        self.audio_enabled = audio_enabled
+        self.audio_device = find_usb_audio() if audio_enabled else ""
+
+        for label in LABELS:
+            channel = self.channel(label)
+            self.kit.servo[channel].set_pulse_width_range(
+                self.min_pulse,
+                self.max_pulse,
+            )
+
+    def channel(self, label: str) -> int:
+        return int(self.channels[label]["channel"])
+
+    def closed(self, label: str) -> float:
+        return float(self.channels[label]["closed_angle"])
+
+    def opened(self, label: str) -> float:
+        return float(self.channels[label]["open_angle"])
+
+    def set_angle(self, label: str, angle: float) -> None:
+        self.kit.servo[self.channel(label)].angle = angle
+
+    def smooth(self, label: str, start: float, target: float) -> None:
+        direction = 1.0 if target >= start else -1.0
+        current = start
+
+        while abs(target - current) > 0.5:
+            current += direction
+            if direction > 0:
+                current = min(current, target)
+            else:
+                current = max(current, target)
+            self.set_angle(label, current)
+            time.sleep(0.005)
+
+    def close_all(self) -> None:
+        print("[초기화] 모든 뚜껑 닫기")
+        for label in LABELS:
+            self.set_angle(label, self.closed(label))
+        time.sleep(1.0)
+
+    def cycle(self, label: str) -> None:
+        print("=" * 64)
+        print(
+            f"[시험] {LABEL_KO[label]} | 채널 {self.channel(label)} | "
+            f"닫힘 {self.closed(label):.1f}° | 열림 {self.opened(label):.1f}°"
+        )
+
+        self.set_angle(label, self.closed(label))
+        time.sleep(0.5)
+        play_wav(label, self.audio_device, self.audio_enabled)
+
+        print("[동작] 열기")
+        self.smooth(label, self.closed(label), self.opened(label))
+        time.sleep(self.hold_seconds)
+
+        print("[동작] 닫기")
+        self.smooth(label, self.opened(label), self.closed(label))
+        time.sleep(0.5)
+
+    def release_all(self) -> None:
+        for label in LABELS:
+            try:
+                self.kit.servo[self.channel(label)].angle = None
+            except Exception:
+                pass
+
+
+def show_config(test: Tester) -> None:
+    print("=" * 72)
+    print("PIR + 음성 + 서보 실제 구현용 통합 테스트")
+    print("=" * 72)
+    for label in LABELS:
+        print(
+            f"{LABEL_KO[label]:8s} 채널={test.channel(label):2d} "
+            f"닫힘={test.closed(label):6.1f}° "
+            f"열림={test.opened(label):6.1f}°"
+        )
+    if test.audio_enabled:
+        print(f"USB 오디오={test.audio_device}")
+    print(f"열림 유지={test.hold_seconds:.1f}초")
+
+
+def menu_mode(test: Tester) -> None:
+    mapping = {
+        "1": "can",
+        "2": "clear_pet",
+        "3": "plastic",
+        "4": "paper",
+    }
+    print("1=캔  2=투명 페트병  3=플라스틱  4=종이")
+    print("a=전체 순차시험  c=모두 닫기  q=종료")
+
+    while True:
+        command = input("명령: ").strip().lower()
+        if command == "q":
+            return
+        if command == "c":
+            test.close_all()
+            continue
+        if command == "a":
+            for label in LABELS:
+                test.cycle(label)
+            continue
+        if command in mapping:
+            test.cycle(mapping[command])
+            continue
+        print("[오류] 1, 2, 3, 4, a, c, q 중 하나를 입력하세요.")
+
+
+def pir_mode(test: Tester, config: dict[str, Any], warmup: float | None) -> None:
+    pir_cfg = config.get("pir", {})
+    gpio_pin = int(pir_cfg.get("gpio_pin", 17))
+    wait_seconds = (
+        float(warmup)
+        if warmup is not None
+        else float(pir_cfg.get("warmup_sec", 15.0))
+    )
+
+    sensor = MotionSensor(
+        gpio_pin,
+        queue_len=int(pir_cfg.get("queue_len", 5)),
+        sample_rate=int(pir_cfg.get("sample_rate", 10)),
+        threshold=float(pir_cfg.get("threshold", 0.6)),
+    )
+    mapping = {
+        "1": "can",
+        "2": "clear_pet",
+        "3": "plastic",
+        "4": "paper",
+    }
+
+    try:
+        print(f"[PIR] GPIO{gpio_pin}, 안정화 {wait_seconds:.0f}초")
+        time.sleep(max(0.0, wait_seconds))
+        print("[PIR] 센서 앞으로 접근하세요.")
+
+        while True:
+            sensor.wait_for_motion()
+            print("[PIR] 사람 접근 감지")
+            play_wav("ready", test.audio_device, test.audio_enabled)
+
+            print("카메라 AI 결과를 키보드로 대신 입력합니다.")
+            print("1=캔 2=투명 페트병 3=플라스틱 4=종이")
+            print("x=기타/거부  r=다시 대기  q=종료")
+            command = input("모의 AI 결과: ").strip().lower()
+
+            if command == "q":
+                return
+            if command == "x":
+                play_wav("other", test.audio_device, test.audio_enabled)
+                print("[거부] 어떤 뚜껑도 열지 않았습니다.")
+            elif command == "r":
+                print("[재대기] 어떤 뚜껑도 열지 않았습니다.")
+            elif command in mapping:
+                test.cycle(mapping[command])
+            else:
+                print("[오류] 잘못된 입력이므로 뚜껑을 열지 않았습니다.")
+
+            print("[PIR] 움직임 해제를 기다립니다.")
+            sensor.wait_for_no_motion()
+            time.sleep(1.0)
+            print("[PIR] 다음 접근 대기")
+    finally:
+        sensor.close()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "mode",
+        nargs="?",
+        choices=("menu", "all", "pir"),
+        default="menu",
+    )
+    parser.add_argument("--no-audio", action="store_true")
+    parser.add_argument("--warmup", type=float, default=None)
+    args = parser.parse_args()
+
+    config = load_config()
+
+    try:
+        test = Tester(config, audio_enabled=not args.no_audio)
+    except Exception as error:
+        print(f"[초기화 실패] {type(error).__name__}: {error}")
+        print("`sudo i2cdetect -y 1`에서 0x40을 확인하세요.")
+        return 1
+
+    try:
+        show_config(test)
+        test.close_all()
+
+        if args.mode == "menu":
+            menu_mode(test)
+        elif args.mode == "all":
+            for label in LABELS:
+                test.cycle(label)
+        else:
+            pir_mode(test, config, args.warmup)
+
+        return 0
+    finally:
+        test.release_all()
+        print("[종료] 모든 서보 PWM 해제")
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print("\n[중단] Ctrl+C")
+        raise SystemExit(130)

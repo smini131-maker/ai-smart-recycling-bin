@@ -27,7 +27,7 @@ def _load_interpreter_class():
     except ImportError as error:
         raise ImportError(
             "LiteRT interpreter is not installed. "
-            "Activate the project virtual environment and install "
+            "Activate /home/smini131/smart_bin/.venv and install "
             "ai-edge-litert."
         ) from error
 
