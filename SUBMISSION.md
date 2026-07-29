@@ -7,7 +7,7 @@
 ## 제24회 임베디드SW경진대회 제출 링크
 
 - GitHub 소스코드: https://github.com/smini131-maker/ai-smart-recycling-bin
-- YouTube 시연 영상: 업로드 후 URL 기입
+- YouTube 시연 영상: https://youtu.be/eEvfFPyp1-g
 
 ## 검토자가 확인할 파일
 
@@ -32,5 +32,5 @@
 - [x] 오프라인 및 부팅 자동 실행 방법 포함
 - [x] TFLite 모델 바이너리 최종 커밋
 - [x] 음성 WAV 최종 커밋
-- [ ] YouTube 시연 영상 링크 추가
+- [x] YouTube 시연 영상 링크 추가
 - [ ] 개발완료보고서에 GitHub/YouTube 링크 반영
