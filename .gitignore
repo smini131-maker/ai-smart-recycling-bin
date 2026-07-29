@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.log
+logs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.before_*
+audio/*_before_*.wav
+.DS_Store
+Thumbs.db
