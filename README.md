@@ -178,7 +178,7 @@ python scripts/preflight.py
 ## 대회 제출 링크
 
 - GitHub 소스코드: **https://github.com/smini131-maker/ai-smart-recycling-bin**
-- 시연 영상: YouTube 업로드 후 [SUBMISSION.md](SUBMISSION.md)에 추가
+- YouTube 시연 영상: **https://youtu.be/eEvfFPyp1-g**
 
 ## 개발자
 
