@@ -71,14 +71,11 @@ flowchart TD
 | 파일 | 역할 |
 |---|---|
 | `smart_bin_final.py` | PIR, 안내, 하드웨어, 카메라 AI 통합 실행 |
-| `smart_bin_camera_ai.py` | 기본 카메라 AI 모듈 진입점 |
-| `source_parts/` | 기본 카메라 AI 원본 소스의 순서 보존 분할본 |
+| `smart_bin_camera_ai.py` | 카메라 상태 머신 및 기본 6종 AI 분류 |
 | `smart_bin_camera_ai_specialist.py` | PET/플라스틱 2단계 분류 연결 |
 | `pet_plastic_specialist_runtime.py` | 전문 TFLite 추론 런타임 |
 | `smart_bin_hardware.py` | WAV 재생, PCA9685, 서보 제어 |
 | `hardware_config.json` | 채널·각도·PIR·오디오 설정 |
-
-`smart_bin_camera_ai.py`는 `source_parts/smart_bin_camera_ai.part00.txt`부터 `part04.txt`까지를 순서대로 결합해 원본 모듈을 그대로 실행합니다.
 
 ## 하드웨어
 
@@ -120,7 +117,7 @@ sudo i2cdetect -y 1
 
 ## 실행용 모델·음성 자산
 
-프로그램 실행에는 다음 최종 자산이 필요합니다.
+최종 실행에 필요한 TFLite 모델과 WAV 안내 음성이 저장소에 포함되어 있습니다.
 
 ```text
 model/garbage_classifier.tflite
@@ -137,7 +134,7 @@ audio/timeout.wav
 audio/remove_wait.wav
 ```
 
-현재 소스와 모델 메타데이터는 공개되어 있으며, Raspberry Pi에서 사용 중인 최종 TFLite/WAV 자산은 제출 마감 전 최종 커밋으로 반영합니다. 모델 해시는 [MODEL_CHECKSUMS.sha256](MODEL_CHECKSUMS.sha256)에 기록되어 있습니다.
+모델 해시는 [MODEL_CHECKSUMS.sha256](MODEL_CHECKSUMS.sha256)에 기록되어 있습니다.
 
 ## 직접 실행
 
